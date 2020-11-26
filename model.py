@@ -17,8 +17,7 @@ params = [
   0.33,   # patients with symptomps
   0.3,   # prob of tested when having symptoms
   0.04,  # prob of being hospitalized
-  0.01,  # death rate 
-  0.00001]  # infRateParam 
+  0.01]  # death rate 
 
 coreParams = len(params)
 
@@ -44,7 +43,7 @@ numTests = [
   10872.7142857143,
   7820.14285714286,
   5599.14285714286,
-  5105.83333333333]
+  4592]
 
 numDeaths = [
   1,
@@ -59,40 +58,40 @@ numDeaths = [
   11.4285714285714,
   13.5714285714286,
   18,
-  29.2857142857143,
-  50.2857142857143,
-  69.2857142857143,
-  105.571428571429,
-  149.285714285714,
-  196.714285714286,
-  213.285714285714,
-  187.428571428571,
-  158.428571428571,
-  112]
+  29.5714285714286,
+  50.1428571428571,
+  69.5714285714286,
+  106.142857142857,
+  149.142857142857,
+  197.285714285714,
+  213.714285714286,
+  188.714285714286,
+  160.285714285714,
+  126.142857142857]
 
 positivePct = [
-  0.033385714285714,
-  0.035642857142857,
-  0.038585714285714,
-  0.042571428571429,
-  0.044228571428572,
-  0.0498,
-  0.064342857142857,
-  0.083528571428572,
-  0.100857142857143,
-  0.107085714285714,
-  0.117342857142857,
-  0.135828571428571,
-  0.196171428571429,
-  0.2477,
-  0.270071428571429,
-  0.302742857142857,
-  0.320414285714286,
-  0.309685714285714,
-  0.302928571428571,
-  0.264214285714286,
-  0.243114285714286,
-  0.24124]
+  0.042028571428572,
+  0.043657142857143,
+  0.046557142857143,
+  0.051514285714286,
+  0.053385714285714,
+  0.059914285714286,
+  0.078285714285714,
+  0.1073,
+  0.130857142857143,
+  0.136757142857143,
+  0.145585714285714,
+  0.164185714285714,
+  0.219314285714286,
+  0.271071428571429,
+  0.295814285714286,
+  0.332528571428571,
+  0.352685714285714,
+  0.343857142857143,
+  0.337314285714286,
+  0.2945,
+  0.267542857142857,
+  0.228671428571429]
 
 hospitalized = [
   109.142857142857,
@@ -116,7 +115,7 @@ hospitalized = [
   7962,
   7799.85714285714,
   6927.28571428571,
-  6430.6]
+  6124.28571428571]
 
 if len(sys.argv) > 1:
   idx = int(sys.argv[1])
@@ -135,15 +134,14 @@ paramRanges = [
   [0.05, 0.95],
   [0.1, 0.6],
   [0.0, 1.0],
-  [0.001, 0.1],
-  [0.0, 1.0]]
+  [0.001, 0.1]]
 
 print(paramRanges)
 
 for i in range (0, len(numTests)):
   # contactFactor
   params.append(1.0)
-  paramRanges.append([0.0, 1.2])
+  paramRanges.append([0.0, 2.0])
 
 
 if len(numTests) != len(numDeaths) or len(numDeaths) != len(positivePct):
@@ -158,25 +156,26 @@ scales = [max(numTests), max(positivePct), max(hospitalized), max(numDeaths)]
 def loss(params, debug=False):
   loss = 0.0
   stepInfected = [params[0]]
+  stepTotalInfected = []
   for i in range (0, len(numTests)):
     step = evalStep(stepInfected, params[1:coreParams], params[coreParams + i], i, debug=debug)
+    stepTotalInfected.append(step[1])
     #loss += (step[6] - numTests[i]) ** 2
     loss += diff(step[6], numTests[i], scales[0])
     positiveTestsPct = (step[-2] + 0.0001) / (step[-3] + 0.0001)
     #loss += 10000 ** 2 * (positiveTestsPct / positivePct[i] - 1.0) ** 2
     loss += 3 * diff(positiveTestsPct, positivePct[i], scales[1])
-    if i > 1:
-      hosp = stepInfected[-2] * params[8]
+    if i > 3:
+      hosp = sum(stepTotalInfected[-5:-2]) * params[8]
       #loss += 10 ** 2 * (hosp - hospitalized[i]) ** 2
-      loss += 2 * diff(hosp, hospitalized[i], scales[2])
+      loss += 5 * diff(hosp, hospitalized[i], scales[2])
     # deaths last few steps are unreliable
     if i > 3:
-      deaths = stepInfected[-4] * params[9]
+      deaths = stepTotalInfected[-5] * params[9]
       #deathLoss = 100 ** 2 * (deaths - numDeaths[i]) ** 2
       deathLoss = diff(deaths, numDeaths[i], scales[3])
       #loss += deathLoss if deaths >= numDeaths[i] else 5 * deathLoss
-      w = .8 if i < len(numTests) - 3 else 0.1
-      loss += w * deathLoss
+      loss += 0.1 * deathLoss
     stepInfected.append(step[-1])
   #endfor
   return loss * score(params)
@@ -200,15 +199,12 @@ def score(params):
   return max(1.0, maxRatio(params)) + 10 * rangePenalty(params)
 
 def evalStep(infectedAll, params, contactFactor, r, debug=False):
-  numOfContacts, probInfected, quaranteenContacts, tracingProb, tracingCapacity, patientsWithSymptoms, probOfBeingTested, hospRate, deathRate, infRate = params
+  numOfContacts, probInfected, quaranteenContacts, tracingProb, tracingCapacity, patientsWithSymptoms, probOfBeingTested, hospRate, deathRate = params
   infected = infectedAll[-1]
   contacts = infected * contactFactor * numOfContacts
-  infRate = 0.0
-  infectiousness = math.tanh((r + 1) * infRate + probInfected)
   if debug:
     print("contacts: %f, infected: %f, factor: %f, numOfContacts: %f" % (contacts, infected, contactFactor, numOfContacts))
-    print("infectiousness: %f" % (infectiousness,))
-  effectiveProbInfected = infectiousness * (1.0 - min(POPULATION, sum(infectedAll[-19:]) * STEP_DAYS) / POPULATION)
+  effectiveProbInfected = probInfected * (1.0 - min(POPULATION, sum(infectedAll[-19:]) * STEP_DAYS) / POPULATION)
   totalInfected = contacts * effectiveProbInfected
   totalTraced = min(tracingCapacity, contacts)
   tracedPositive = totalTraced * tracingProb * effectiveProbInfected
@@ -242,11 +238,13 @@ for item in res.x:
   print(item)
 
 infected = [res.x[0]]
+totalInfected = []
 deaths = []
 hosp = []
 for i in range (0, len(numTests)):
   step = evalStep(infected, res.x[1:coreParams], res.x[coreParams + i], i, debug=True)
+  totalInfected.append(step[1])
   deaths.append(step[1] * res.x[9])
-  hosp.append(step[1] * res.x[8])
-  print (step, None if i < 4 else deaths[-4], numDeaths[i], None if i < 2 else hosp[-2], hospitalized[i], step[-2], numTests[i], step[-2] / step[-3], positivePct[i], score(res.x))
+  hosp.append(0 if i < 4 else sum(totalInfected[-5:-2]) * res.x[8])
+  print (step, None if i < 4 else deaths[-5], numDeaths[i], None if i < 2 else hosp[-2], hospitalized[i], step[-2], numTests[i], step[-2] / step[-3], positivePct[i], score(res.x))
   infected.append(step[-1])

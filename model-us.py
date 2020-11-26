@@ -47,7 +47,8 @@ numTests = [
   85173,
   107547.142857143,
   136440.571428571,
-  158000]
+  158000,
+  169058.285714286]
 
 numDeaths = [
   665.714285714286,
@@ -76,7 +77,8 @@ numDeaths = [
   909.428571428571,
   1003.14285714286,
   1069.71428571429,
-  1211.42857142857]
+  1211.42857142857,
+  1525.71428571429]
 
 positivePct = [
   0.075504126887962,
@@ -105,7 +107,8 @@ positivePct = [
   0.068445093501436,
   0.079735260243606,
   0.095806737397725,
-  0.102163773511512]
+  0.102163773511512,
+  0.097109461654664]
 
 hospitalized = [
   44394.1428571429,
@@ -134,7 +137,8 @@ hospitalized = [
   47361.8571428572,
   53092,
   62123.2857142857,
-  72043]
+  72043,
+  81707.7142857143]
 
 paramRanges = [
   [0, 1000000],  # initial infected
@@ -183,7 +187,7 @@ def loss(params):
       #deathLoss = 100 ** 2 * (deaths - numDeaths[i]) ** 2
       deathLoss = diff(deaths, numDeaths[i], scales[3])
       #loss += deathLoss if deaths >= numDeaths[i] else 5 * deathLoss
-      loss += 2 * deathLoss
+      loss += deathLoss
     stepInfected.append(step[-1])
   #endfor
   return loss * score(params)
