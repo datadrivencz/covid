@@ -5,7 +5,7 @@ import math
 import scipy.optimize as optimize
 
 
-def computeInitialParams(numTests, positivePct, hospitalized, numDeaths, population, stepDays):
+def computeInitialParams(numTests, positivePct, hospitalized, numDeaths, population, stepDays, agTests=[]):
 
   global POPULATION
   global STEP_DAYS
@@ -13,14 +13,17 @@ def computeInitialParams(numTests, positivePct, hospitalized, numDeaths, populat
   POPULATION = population
   STEP_DAYS = stepDays
 
-  inp = (numTests, positivePct, hospitalized, numDeaths)
+  if len(agTests) == 0:
+    agTests = [0.0 for i in range (0, len(numTests))]
+
+  inp = (numTests, positivePct, hospitalized, numDeaths, agTests)
   inpl = [map(lambda x: len(x), inp)]
   for l in inpl:
     if inpl[0] != l:
       raise Exception("All input parameters must have equal length, got %d" % (l, ))
 
   #scales = [max(numTests), max(positivePct), max(hospitalized), max(numDeaths)]
-  scales = [math.sqrt(i) for i in (max(numTests), max(positivePct), max(hospitalized), max(numDeaths))]
+  scales = [math.sqrt(i) for i in (max(numTests), max(positivePct), max(hospitalized), max(numDeaths), max(agTests))]
 
   params = [
     numTests[0] * 10,   # initial contacts
@@ -36,11 +39,11 @@ def computeInitialParams(numTests, positivePct, hospitalized, numDeaths, populat
   
   paramRanges = [
     [numTests[0] * 5, 100 * numTests[0]],  # initial infected
-    [10, 50],
-    [0.01, 0.9],
+    [15, 50],
+    [0.01, 0.15],
     [0.05, 10],
     [0.01, 0.8],
-    [0,POPULATION / 100],
+    [POPULATION * 0.0002, POPULATION * 0.01],
     [0.05, 0.4],
     [0.0, 0.1],
     [0.0, 1.0],
@@ -62,7 +65,7 @@ def diff(a, b, scale):
 
 
 def loss(params, paramRanges, scales, data, debug=False):
-  numTests, positivePct, numDeaths, hospitalized = data
+  numTests, positivePct, numDeaths, hospitalized, agTests = data
   coreParams = len(params) - len(numTests)
   loss = 0.0
   stepContacts = params[0]
@@ -82,6 +85,9 @@ def loss(params, paramRanges, scales, data, debug=False):
       deaths = steps[-5][1] * params[9]
       deathLoss = diff(deaths, numDeaths[i], scales[3])
       loss += math.sqrt(i+1) * OPT_WEIGHTS[3] * deathLoss if deaths >= numDeaths[i] else OPT_WEIGHTS[4] * deathLoss
+    if agTests[i] > 0:
+      positivePctAg = sum(map(lambda x: x[1], steps[-4:-1])) * STEP_DAYS / POPULATION
+      loss += math.sqrt(i+1) * OPT_WEIGHTS[5] * diff(positivePctAg, agTests[i], scales[4])
   #endfor
   return loss * score(params, paramRanges, coreParams)
 #enddef
@@ -98,7 +104,7 @@ def score(params, paramRanges, coreParams):
 def evalStep(contacts, lastSteps, params, contactFactor, r, debug=False):
   numOfContacts, probInfected, quaranteenContacts, tracingProb, tracingCapacity, probOfBeingTested, probTestedRandomly, hospRate, deathRate = params
   withImmunity = STEP_DAYS * sum(map(lambda x: x[1], lastSteps[-39:]))
-  infectiousness = (1 - min(0.7, withImmunity / POPULATION)) * probInfected
+  infectiousness = (1 - min(0.7, withImmunity / POPULATION)) * min(1.0, probInfected)
   totalInfected = contacts * infectiousness
   tracedTotal = min(tracingCapacity, contacts * tracingProb)
   tracedPositive = tracedTotal * infectiousness
@@ -113,7 +119,7 @@ def printResult(res, data, paramRanges):
   for item in res:
     print(item)
  
-  numTests, positivePct, numDeaths, hospitalized = data 
+  numTests, positivePct, numDeaths, hospitalized, agTests = data 
   coreParams = len(res) - len(numTests)
   contacts = res[0]
   steps = []
@@ -127,12 +133,15 @@ def printResult(res, data, paramRanges):
     hosp.append(0 if i < 4 else sum(map(lambda x: x[1], steps[-5:-2])) * res[8])
     print (step, None if i < 4 else deaths[-5], numDeaths[i], None if i < 2 else hosp[-2], hospitalized[i], step[-2], numTests[i], step[-2] / step[-3], positivePct[i], score(res, paramRanges, coreParams))
 
-def runOptimization(params, paramRanges, scales, data, w = (1, 1, 1, 1, 1)):
+def runOptimization(params, paramRanges, scales, data, w = (1, 1, 1, 1, 1, 0.0)):
 
   global OPT_WEIGHTS
   OPT_WEIGHTS = w
 
   print(paramRanges)
+
+  if len(data) != 5:
+    data = (*data, [0.0 for i in range (0, len(data[0]))])
 
   startingLoss = loss(params, paramRanges, scales, data)
   print("loss: %f" % (startingLoss, ))

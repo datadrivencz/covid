@@ -43,8 +43,11 @@ numTests = [
   205647,
   228374.857142857,
   214939.142857143,
-  189326.285714286,
-  179248]
+  210362.53968254,
+  210880,
+  212546.857142857,
+  247156.428571429,
+  234593.428571429]
 
 numDeaths = [
   540.142857142857,
@@ -82,7 +85,10 @@ numDeaths = [
   2565,
   2633.14285714286,
   2425.71428571429,
-  2287.28571428571]
+  2287.28571428571,
+  2640.85714285714,
+  3121.71428571429,
+  3317.42857142857]
 
 positivePct = [
   0.075058262595191,
@@ -120,7 +126,10 @@ positivePct = [
   0.119716020533573,
   0.122004420083525,
   0.109005407952565,
-  0.115942984911142]
+  0.115942984911142,
+  0.13744228943736,
+  0.140626733008362,
+  0.120027075084334]
 
 hospitalized = [
   39544.7142857143,
@@ -158,7 +167,10 @@ hospitalized = [
   109033.857142857,
   113290.714285714,
   117040.285714286,
-  120900.571428571]
+  120900.571428571,
+  125387.142857143,
+  130352.142857143,
+  130329]
 
 if len(sys.argv) > 1:
   idx = int(sys.argv[1])
@@ -169,4 +181,4 @@ if len(sys.argv) > 1:
 
 params, paramRanges, scales = computeInitialParams(numTests, positivePct, hospitalized, numDeaths, POPULATION, STEP_DAYS)
 
-runOptimization(params, paramRanges, scales, (numTests, positivePct, numDeaths, hospitalized), w = (2.0, 1.0, 1.0, 1.0, 1.0))
+runOptimization(params, paramRanges, scales, (numTests, positivePct, numDeaths, hospitalized), w = (2.0, 1.0, 1.0, 1.0, 1.0, 0.0))
